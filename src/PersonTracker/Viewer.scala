@@ -126,10 +126,26 @@ object Viewer extends JFXApp {
     val tempRoomNode: thing = new roomNode(name,newRoomNode)
     tempRoomNode.xPos=xVal
     tempRoomNode.yPos=yVal //- l / 2.0
-    //store height and width in variables
+    //store radius in variable
     tempRoomNode.width = roomCircleRadius
     allRoomNodes += tempRoomNode
     sceneGraphics.children.add(newRoomNode)
+  }
+
+  def drawBubble(xVal: Double, yVal: Double, name:String, w: Double): Unit = {
+    val newBubble = new Circle() {
+      centerX = xVal
+      centerY = yVal
+      radius = w
+      fill = Color.Orange
+    }
+    val tempBubble: thing = new bubble(name,newBubble)
+    tempBubble.xPos=xVal
+    tempBubble.yPos=yVal //- l / 2.0
+    //store radius in variable
+    tempBubble.width = roomCircleRadius
+    allBubbles+= tempBubble
+    sceneGraphics.children.add(newBubble)
   }
 
   this.stage = new PrimaryStage {
