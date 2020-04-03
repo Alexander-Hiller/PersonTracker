@@ -1,3 +1,6 @@
+
+//Did update work
+
 import PersonTracker.Objects._
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
@@ -138,12 +141,13 @@ object Viewer extends JFXApp {
       centerY = yVal
       radius = w
       fill = Color.Orange
+      opacity = 0.5
     }
     val tempBubble: thing = new bubble(name,newBubble)
     tempBubble.xPos=xVal
     tempBubble.yPos=yVal //- l / 2.0
     //store radius in variable
-    tempBubble.width = roomCircleRadius
+    tempBubble.width = w
     allBubbles+= tempBubble
     sceneGraphics.children.add(newBubble)
   }
