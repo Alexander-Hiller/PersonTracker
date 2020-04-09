@@ -7,5 +7,7 @@ abstract class thing(name: String, inShape: Shape) {
   var yPos: Double
   var width: Double
   var height: Double
+  var xDirection: Double
+  var yDirection: Double
   var shape:Shape
 }

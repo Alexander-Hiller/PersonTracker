@@ -8,6 +8,8 @@ class bubble(val name: String, val inShape: Shape) extends thing(name, inShape) 
   //use the width variable to describe radius
   var width: Double = 5
   var height: Double = 5
+  var xDirection: Double = 0
+  var yDirection: Double = 0
   var shape:Shape = inShape
   override def toString: String ={
     this.name

@@ -1,6 +1,4 @@
 
-//Did update work
-
 import PersonTracker.Objects._
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
@@ -29,6 +27,8 @@ object Viewer extends JFXApp {
   val windowHeight: Double = 800
   val userCircleRadius:Double =10
   val roomCircleRadius:Double =20
+  //delta variable is the uncertainty of a measurement in pixels
+  val delta: Double = 10
 
   //http handlers
   import akka.http.scaladsl.unmarshalling.Unmarshal
@@ -62,9 +62,11 @@ object Viewer extends JFXApp {
     drawWall(1000,300,"EastWall_2",5,400)
     drawWall(800,100,"NorthWall_2",400,5)
     drawDoor(1000,300,"EastDoor_2",5,50)
-    drawRoomNode(975,475,"RoomNode_1", 15)
+    drawRoomNode(975,475,"RoomNode_2_1", 15)
+    drawRoomNode(650,150,"RoomNode_2_2", 15)
 
     drawWall(600,600,"SouthWall_hallway",1200,5)
+    drawRoomNode(100,620,"Hall_1", 15)
   }
 
   def drawWall(centerX: Double, centerY: Double, name:String, w: Double, h:Double): Unit = {
@@ -136,22 +138,95 @@ object Viewer extends JFXApp {
   }
 
   def drawBubble(xVal: Double, yVal: Double, name:String, w: Double): Unit = {
-    val newBubble = new Circle() {
+    val minNewBubble = new Circle() {
       centerX = xVal
       centerY = yVal
-      radius = w
+      radius = w - delta
       fill = Color.Orange
-      opacity = 0.5
+      opacity = 0.1
     }
-    val tempBubble: thing = new bubble(name,newBubble)
-    tempBubble.xPos=xVal
-    tempBubble.yPos=yVal //- l / 2.0
+    val maxNewBubble = new Circle() {
+      centerX = xVal
+      centerY = yVal
+      radius = w + delta
+      fill = Color.Blue
+      opacity = 0.1
+    }
+    val minTempBubble: thing = new bubble(name,minNewBubble)
+    val maxTempBubble: thing = new bubble(name,maxNewBubble)
+    minTempBubble.xPos=xVal
+    maxTempBubble.xPos=xVal
+    minTempBubble.yPos=yVal
+    maxTempBubble.yPos=yVal
     //store radius in variable
-    tempBubble.width = w
-    allBubbles+= tempBubble
-    sceneGraphics.children.add(newBubble)
+    minTempBubble.width = w - delta
+    maxTempBubble.width = w + delta
+    allBubbles+= minTempBubble
+    allBubbles+= maxTempBubble
+    sceneGraphics.children.add(minNewBubble)
+    sceneGraphics.children.add(maxNewBubble)
   }
 
+  def screenUpdate(): Unit = {
+    //first clear all bubbles
+    for(bubble <- allBubbles){
+      sceneGraphics.children.remove(bubble.shape)
+      allBubbles -= bubble
+    }
+
+    //This is for testing. it moves the user
+    for (user <- allUsers) {
+      //x Movement
+      if (user.xDirection == 1) {
+        if (user.xPos < 1100) {
+          user.shape.translateX.value += 5
+          user.xPos += 5
+        }
+        else {
+          user.xDirection = 0
+        }
+      }
+      else {
+        if (user.xPos > 100) {
+          user.shape.translateX.value -= 5
+          user.xPos -= 5
+        }
+        else {
+          user.xDirection = 1
+        }
+      }
+      //y Movement
+      if (user.yDirection == 1) {
+        if (user.yPos < 750) {
+          user.shape.translateY.value += 5
+          user.yPos += 5
+        }
+        else {
+          user.yDirection = 0
+        }
+      }
+      else {
+        if (user.yPos > 50) {
+          user.shape.translateY.value -= 5
+          user.yPos -= 5
+        }
+        else {
+          user.yDirection = 1
+        }
+      }
+      //DrawBubbles based on user position
+        for(room <- allRoomNodes)
+          {
+            //distance calc from node
+            val nodeDistance: Double = math.sqrt(math.abs(room.xPos-user.xPos)*math.abs(room.xPos-user.xPos)+math.abs(room.yPos-user.yPos)*math.abs(room.yPos-user.yPos))
+            val bubName: String = room.toString + user.toString
+            drawBubble(room.xPos,room.yPos,bubName,nodeDistance)
+          }
+
+
+    }
+
+  }
   this.stage = new PrimaryStage {
     //window setup
     this.title = "High Security Person Tracker"
@@ -173,6 +248,7 @@ object Viewer extends JFXApp {
       //update code here
       //var html = Await.result(get("http://192.168.4.1/data"), 20.seconds)
       //println(html)
+      screenUpdate()
     }
     AnimationTimer(update).start()
     // Start Animations. Calls update 60 times per second (takes update as an argument)
