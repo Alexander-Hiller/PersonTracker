@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
+import play.api.libs.json.{JsValue, Json}
 //testing new key
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Await
@@ -29,6 +30,7 @@ object Viewer extends JFXApp {
   val roomCircleRadius:Double =20
   //delta variable is the uncertainty of a measurement in pixels
   val delta: Double = 10
+  var signalScaler: Double = 3
 
   //http handlers
   import akka.http.scaladsl.unmarshalling.Unmarshal
@@ -55,18 +57,18 @@ object Viewer extends JFXApp {
     drawWall(400,100,"NorthWall_1",400,5)
     drawDoor(400,500,"SouthDoor_1",50,5)
     //room nodes shall be named the same as the expected room node
-    drawRoomNode(225,150,"RoomNode_1", 15)
+    drawRoomNode(225,150,"Station4", 15)
 
     drawWall(600,300,"WestWall_2",5,400)
     drawWall(800,500,"SouthWall_2",400,5)
     drawWall(1000,300,"EastWall_2",5,400)
     drawWall(800,100,"NorthWall_2",400,5)
     drawDoor(1000,300,"EastDoor_2",5,50)
-    drawRoomNode(975,475,"RoomNode_2_1", 15)
-    drawRoomNode(650,150,"RoomNode_2_2", 15)
+    drawRoomNode(975,475,"Station2", 15)
+    drawRoomNode(650,150,"Station1", 15)
 
     drawWall(600,600,"SouthWall_hallway",1200,5)
-    drawRoomNode(100,620,"Hall_1", 15)
+    drawRoomNode(100,620,"Station3", 15)
   }
 
   def drawWall(centerX: Double, centerY: Double, name:String, w: Double, h:Double): Unit = {
@@ -167,6 +169,16 @@ object Viewer extends JFXApp {
     sceneGraphics.children.add(maxNewBubble)
   }
 
+  // how we determine where the user is
+  def localize(): Unit = {
+
+    //a distance to a user is received.
+    //cycle through all users
+    for(user<-allUsers){
+      //when we get to the correct user
+      // use the data map to solve for the radius (and what x and y's are shared)
+    }
+  }
   def screenUpdate(): Unit = {
     //first clear all bubbles
     for(bubble <- allBubbles){
@@ -234,7 +246,8 @@ object Viewer extends JFXApp {
     scene = new Scene(windowWidth, windowHeight) {
       content = List(sceneGraphics)
     }
-
+    //User uses keyboard
+      addEventHandler(KeyEvent.KEY_PRESSED, (event: KeyEvent) => keyPressed(event.getCode))
       // event handler for user mouse click... Just using it now to spawn users
       addEventHandler(MouseEvent.MOUSE_CLICKED, (event: MouseEvent) => {
         val bullNum:Double=Math.random()*1000
@@ -246,14 +259,68 @@ object Viewer extends JFXApp {
 
     val update: Long => Unit = (time: Long) => {
       //update code here
-      //var html = Await.result(get("http://192.168.4.1/data"), 20.seconds)
-      //println(html)
-      screenUpdate()
+      var json = Await.result(get("http://192.168.4.1/data"), 20.seconds)
+      println(json)
+      fromJSON(json)
+      //screenUpdate()
     }
     AnimationTimer(update).start()
     // Start Animations. Calls update 60 times per second (takes update as an argument)
   }
 
+  def fromJSON(jsonState: String): Unit = {
+    //variables
+    var tempX: Double = 0;
+    var tempY: Double = 0;
+
+
+    // make lists of objects by type
+    val parsed: JsValue = Json.parse(jsonState)
+    val station = (parsed \ "station").as[String]
+    val user = (parsed \ "user").as[String]
+    var strength = (parsed \ "strength").as[Double]
+    val bubbleName = station + "_" + user
+
+
+    //strength transformation
+    strength *= -1
+    strength *= signalScaler
+    println(strength.toString)
+
+    //search for the station in the existing nodes
+    for(room <- allRoomNodes)
+    {
+      //When the room node is found then extract x,y info
+      if(station==room.toString){
+        tempX = room.xPos
+        tempY = room.yPos
+      }
+    }
+
+    //search existing bubbles
+    for(bubble <- allBubbles)
+    {
+      //if the bubble exists: destroy it
+      if(bubble.toString == bubbleName){
+        sceneGraphics.children.remove(bubble.shape)
+        allBubbles -= bubble
+      }
+    }
+
+    //draw the new bubble
+    drawBubble(tempX,tempY,bubbleName,strength)
+
+  }
+
+
+  def keyPressed(keyCode: KeyCode): Unit = {
+
+        keyCode.getName match {
+          case "Up" | "W" =>signalScaler+=1
+          case "Down"| "S" => signalScaler-=1
+          //case _ => println (keyCode.getName + " pressed with no action")
+        }
+  }
 
 
   def get(uri: String) = {
