@@ -30,7 +30,8 @@ object Viewer extends JFXApp {
   val roomCircleRadius:Double =20
   //delta variable is the uncertainty of a measurement in pixels
   val delta: Double = 10
-  var signalScaler: Double = 3
+  var signalScaler: Double = 1
+  val pixPerFoot: Double = 23.265
 
   //http handlers
   import akka.http.scaladsl.unmarshalling.Unmarshal
@@ -287,8 +288,10 @@ object Viewer extends JFXApp {
 
 
       //strength transformation
-      strength *= -1
+      strength += 56
+      strength *= (-1.0792)
       strength *= signalScaler
+      strength *=  pixPerFoot
       //println(strength.toString)
 
       //search for the station in the existing nodes
@@ -318,8 +321,8 @@ object Viewer extends JFXApp {
   def keyPressed(keyCode: KeyCode): Unit = {
 
         keyCode.getName match {
-          case "Up" | "W" =>signalScaler+=1
-          case "Down"| "S" => signalScaler-=1
+          case "Up" | "W" =>signalScaler+=0.1
+          case "Down"| "S" => signalScaler-=0.1
           //case _ => println (keyCode.getName + " pressed with no action")
         }
   }
