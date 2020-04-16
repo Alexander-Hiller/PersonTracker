@@ -276,40 +276,42 @@ object Viewer extends JFXApp {
 
     // make lists of objects by type
     val parsed: JsValue = Json.parse(jsonState)
-    val station = (parsed \ "station").as[String]
-    val user = (parsed \ "user").as[String]
-    var strength = (parsed \ "strength").as[Double]
-    val bubbleName = station + "_" + user
 
 
-    //strength transformation
-    strength *= -1
-    strength *= signalScaler
-    println(strength.toString)
+    val elements = (parsed \ "Data").as [Map[String,JsValue]]
+    for(elem<-elements.keys) {
+      val station = (elements(elem) \ "station").as[String]
+      val user = (elements(elem) \ "user").as[String]
+      var strength = (elements(elem) \ "strength").as[Double]
+      val bubbleName = station + "_" + user
 
-    //search for the station in the existing nodes
-    for(room <- allRoomNodes)
-    {
-      //When the room node is found then extract x,y info
-      if(station==room.toString){
-        tempX = room.xPos
-        tempY = room.yPos
+
+      //strength transformation
+      strength *= -1
+      strength *= signalScaler
+      //println(strength.toString)
+
+      //search for the station in the existing nodes
+      for (room <- allRoomNodes) {
+        //When the room node is found then extract x,y info
+        if (station == room.toString) {
+          tempX = room.xPos
+          tempY = room.yPos
+        }
       }
-    }
 
-    //search existing bubbles
-    for(bubble <- allBubbles)
-    {
-      //if the bubble exists: destroy it
-      if(bubble.toString == bubbleName){
-        sceneGraphics.children.remove(bubble.shape)
-        allBubbles -= bubble
+      //search existing bubbles
+      for (bubble <- allBubbles) {
+        //if the bubble exists: destroy it
+        if (bubble.toString == bubbleName) {
+          sceneGraphics.children.remove(bubble.shape)
+          allBubbles -= bubble
+        }
       }
+
+      //draw the new bubble
+      drawBubble(tempX, tempY, bubbleName, strength)
     }
-
-    //draw the new bubble
-    drawBubble(tempX,tempY,bubbleName,strength)
-
   }
 
 
