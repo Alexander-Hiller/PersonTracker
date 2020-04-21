@@ -29,7 +29,7 @@ object Viewer extends JFXApp {
   val userCircleRadius:Double =10
   val roomCircleRadius:Double =20
   //delta variable is the uncertainty of a measurement in pixels
-  val delta: Double = 10
+  val delta: Double = 20
   var signalScaler: Double = 1
   val pixPerFoot: Double = 23.265
 
@@ -44,6 +44,8 @@ object Viewer extends JFXApp {
   var allUsers = new ListBuffer[thing]()
   var allBubbles = new ListBuffer[thing]()
   var allRoomNodes = new ListBuffer[thing]()
+  var allRooms = new ListBuffer[rooms]()
+  var subRooms = new ListBuffer[rooms]()
 
 
   def wallGen(): Unit = {
@@ -59,6 +61,8 @@ object Viewer extends JFXApp {
     drawDoor(400,500,"SouthDoor_1",50,5)
     //room nodes shall be named the same as the expected room node
     drawRoomNode(225,150,"Station4", 15)
+    // add a room with name
+    newRoom(200,100,600,500,"Left Room")
 
     drawWall(600,300,"WestWall_2",5,400)
     drawWall(800,500,"SouthWall_2",400,5)
@@ -67,10 +71,31 @@ object Viewer extends JFXApp {
     drawDoor(1000,300,"EastDoor_2",5,50)
     drawRoomNode(975,475,"Station2", 15)
     drawRoomNode(650,150,"Station1", 15)
+    // add a room with name
+    newRoom(600,100,1000,500,"Right Room")
 
     drawWall(600,600,"SouthWall_hallway",1200,5)
     drawRoomNode(100,620,"Station3", 15)
   }
+
+  def newRoom(minX: Double, minY: Double, maxX: Double, maxY: Double, name:String): Unit = {
+    val tempRoom: rooms = new rooms(name)
+    tempRoom.xMin = minX
+    tempRoom.xMax = maxX
+    tempRoom.yMin = minY
+    tempRoom.yMax = maxY
+    allRooms += tempRoom
+  }
+
+  def newSubRoom(minX: Double, minY: Double, maxX: Double, maxY: Double, name:String): Unit = {
+    val tempRoom: rooms = new rooms(name)
+    tempRoom.xMin = minX
+    tempRoom.xMax = maxX
+    tempRoom.yMin = minY
+    tempRoom.yMax = maxY
+    subRooms += tempRoom
+  }
+
 
   def drawWall(centerX: Double, centerY: Double, name:String, w: Double, h:Double): Unit = {
     val newWall = new Rectangle() {
@@ -112,7 +137,7 @@ object Viewer extends JFXApp {
     val newUser = new Circle() {
       centerX = xVal
       centerY = yVal
-      radius = userCircleRadius
+      radius = w
       fill = Color.Yellow
     }
     val tempUser: thing = new user(name,newUser)
@@ -172,14 +197,135 @@ object Viewer extends JFXApp {
 
   // how we determine where the user is
   def localize(): Unit = {
+    var tempCenterX: Int = 0
+    var tempCenterY: Int = 0
+    var tempRadius: Double = 0
+    var tempX: Int = 0
+    var tempY: Int = 0
+    var tempFit: Double = 0
+    var roomFlag: Int = 0
+    var deg: Int = 0;
+    var maxVote: Double = 0;
 
-    //a distance to a user is received.
-    //cycle through all users
-    for(user<-allUsers){
-      //when we get to the correct user
-      // use the data map to solve for the radius (and what x and y's are shared)
+    //cycle through all rooms
+    for(room<-allRooms){
+      room.vote = 0
+      //check all bubbles for edges in a room
+      for(bubble <- allBubbles){
+        tempCenterX = bubble.xPos.toInt
+        tempCenterY = bubble.yPos.toInt
+        tempRadius = bubble.width
+        roomFlag = 0
+
+
+        //another way, using trig
+        for(deg <- 0 to 360){
+          if (roomFlag<1) {
+            val x: Double = bubble.xPos + bubble.width * math.sin(deg.toDouble * math.Pi / 180)
+            val y: Double = (bubble.yPos - bubble.width * math.cos(deg.toDouble * math.Pi / 180))
+            if ((x < room.xMax) & (x > room.xMin) & (y < room.yMax) & (y > room.yMin)) {
+              room.vote += 1
+              roomFlag = 1
+            }
+          }
+        }
+
+        /* //this way works... but not well
+        for(tempX <- room.xMin.toInt to room.xMax.toInt){
+          for(tempY <- room.yMin.toInt to room.yMax.toInt){
+            if(roomFlag < 1) {
+              tempFit = math.sqrt(math.pow((tempX - tempCenterX).toDouble, 2) + math.pow((tempY - tempCenterX).toDouble, 2))
+              if ((tempFit < tempRadius + 2) & (tempFit > tempRadius - 2)) {
+                room.vote += 1
+                roomFlag = 1
+              }
+            }
+          }
+        }
+        */
+      }
+      if(room.vote > maxVote)maxVote = room.vote
+      println(room.toString + ": " + room.vote.toString)
     }
+
+    // calculate a point based on all circles
+    for(room<-allRooms){
+      if(room.vote == maxVote){
+        // split the room into 16 rectangles (4 x 4) "subRooms"
+        val deltaX: Double = (room.xMax -room.xMin)/4
+        val deltaY: Double = (room.xMax -room.xMin)/4
+        for(i<- 0 to 3) {
+          for(j<- 0 to 3) {
+            newSubRoom(room.xMin + deltaX * j.toDouble, room.yMin + deltaY * i.toDouble, room.xMin + deltaX * (j + 1).toDouble, room.yMin + deltaY * (i + 1).toDouble, room.toString + "(" + j.toString + "," + i.toString + ")")
+          }
+        }
+      }
+    }
+
+
+    //cycle through all sub rooms
+    maxVote = 0
+    for(room<-subRooms){
+      room.vote = 0
+      //check all bubbles for edges in a room
+      for(bubble <- allBubbles){
+        tempCenterX = bubble.xPos.toInt
+        tempCenterY = bubble.yPos.toInt
+        tempRadius = bubble.width
+        roomFlag = 0
+
+
+        //another way, using trig
+        for(deg <- 0 to 360){
+          if (roomFlag<1) {
+            val x: Double = bubble.xPos + bubble.width * math.sin(deg.toDouble * math.Pi / 180)
+            val y: Double = (bubble.yPos - bubble.width * math.cos(deg.toDouble * math.Pi / 180))
+            if ((x < room.xMax) & (x > room.xMin) & (y < room.yMax) & (y > room.yMin)) {
+              room.vote += 1
+              roomFlag = 1
+            }
+          }
+        }
+
+        /* //this way works... but not well
+        for(tempX <- room.xMin.toInt to room.xMax.toInt){
+          for(tempY <- room.yMin.toInt to room.yMax.toInt){
+            if(roomFlag < 1) {
+              tempFit = math.sqrt(math.pow((tempX - tempCenterX).toDouble, 2) + math.pow((tempY - tempCenterX).toDouble, 2))
+              if ((tempFit < tempRadius + 2) & (tempFit > tempRadius - 2)) {
+                room.vote += 1
+                roomFlag = 1
+              }
+            }
+          }
+        }
+        */
+      }
+      if(room.vote > maxVote)maxVote = room.vote
+      //println(room.toString + ": " + room.vote.toString)
+    }
+
+    //delete all sub rooms when done
+    //temp delete all users until I add code to track better
+    for(user<-allUsers){
+      allUsers -= user
+      sceneGraphics.children.remove(user.shape)
+    }
+    for(room<-subRooms) {
+      if(room.vote == maxVote){
+        val deltaX: Double = (room.xMax -room.xMin)/4
+        val deltaY: Double = (room.xMax -room.xMin)/4
+        drawUser(room.xMin + deltaX,room.yMin + deltaY,room.toString, deltaY)
+      }
+    subRooms-=room
+    }
+
+
   }
+
+
+
+
   def screenUpdate(): Unit = {
     //first clear all bubbles
     for(bubble <- allBubbles){
@@ -263,6 +409,7 @@ object Viewer extends JFXApp {
       var json = Await.result(get("http://192.168.4.1/data"), 20.seconds)
       println(json)
       fromJSON(json)
+      localize()
       //screenUpdate()
     }
     AnimationTimer(update).start()
@@ -290,6 +437,7 @@ object Viewer extends JFXApp {
       //strength transformation
       strength += 56
       strength *= (-1.0792)
+      if(strength < 0) strength = 1
       strength *= signalScaler
       strength *=  pixPerFoot
       //println(strength.toString)
