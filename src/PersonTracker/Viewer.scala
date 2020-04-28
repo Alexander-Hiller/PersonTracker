@@ -5,6 +5,8 @@ import akka.stream.ActorMaterializer
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import play.api.libs.json.{JsValue, Json}
+
+import scala.collection.mutable
 //testing new key
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Await
@@ -20,6 +22,9 @@ import scalafx.scene.paint.Color
 import scalafx.scene.shape.{Circle, Rectangle, Shape}
 import scalafx.scene.{Group, Scene}
 
+//Todo: Uncertainty based on radius, measure between radius for extra vote, user specific, shift user circls apropriate distance (right and down), Why on one room
+
+
 
 object Viewer extends JFXApp {
   //graphics variables
@@ -28,10 +33,9 @@ object Viewer extends JFXApp {
   val windowHeight: Double = 800
   val userCircleRadius:Double =10
   val roomCircleRadius:Double =20
-  //delta variable is the uncertainty of a measurement in pixels
-  val delta: Double = 20
   var signalScaler: Double = 1
   val pixPerFoot: Double = 23.265
+  val doorUnlockRadius: Double = 100
 
   //http handlers
   import akka.http.scaladsl.unmarshalling.Unmarshal
@@ -46,8 +50,8 @@ object Viewer extends JFXApp {
   var allRoomNodes = new ListBuffer[thing]()
   var allRooms = new ListBuffer[rooms]()
   var subRooms = new ListBuffer[rooms]()
-
-
+  //map for timestamps
+  var timeMap: scala.collection.mutable.Map[String, Double] = mutable.Map.empty[String, Double]
   def wallGen(): Unit = {
     //Delete Any Existing Barriers
     for (wall<- allWalls){
@@ -124,8 +128,8 @@ object Viewer extends JFXApp {
       fill = Color.Red
     }
     val tempDoor: thing = new door(name,newDoor)
-    tempDoor.xPos=centerX //- w / 2.0
-    tempDoor.yPos=centerY //- l / 2.0
+    tempDoor.xPos=centerX
+    tempDoor.yPos=centerY
     //store height and width in variables
     tempDoor.width = w
     tempDoor.height = h
@@ -166,12 +170,22 @@ object Viewer extends JFXApp {
   }
 
   def drawBubble(xVal: Double, yVal: Double, name:String, w: Double): Unit = {
+    //delta variable is the uncertainty of a measurement in pixels
+    val delta: Double = w*0.05 + 10
+
     val minNewBubble = new Circle() {
       centerX = xVal
       centerY = yVal
       radius = w - delta
       fill = Color.Orange
       opacity = 0.1
+    }
+    val midNewBubble = new Circle() {
+      centerX = xVal
+      centerY = yVal
+      radius = w - delta
+      fill = Color.Red
+      opacity = 0.01
     }
     val maxNewBubble = new Circle() {
       centerX = xVal
@@ -181,17 +195,23 @@ object Viewer extends JFXApp {
       opacity = 0.1
     }
     val minTempBubble: thing = new bubble(name,minNewBubble)
+    val midTempBubble: thing = new bubble(name,midNewBubble)
     val maxTempBubble: thing = new bubble(name,maxNewBubble)
     minTempBubble.xPos=xVal
+    midTempBubble.xPos=xVal
     maxTempBubble.xPos=xVal
     minTempBubble.yPos=yVal
+    midTempBubble.yPos=yVal
     maxTempBubble.yPos=yVal
     //store radius in variable
     minTempBubble.width = w - delta
+    midTempBubble.width = w
     maxTempBubble.width = w + delta
     allBubbles+= minTempBubble
+    allBubbles+= midTempBubble
     allBubbles+= maxTempBubble
     sceneGraphics.children.add(minNewBubble)
+    sceneGraphics.children.add(midNewBubble)
     sceneGraphics.children.add(maxNewBubble)
   }
 
@@ -210,13 +230,22 @@ object Viewer extends JFXApp {
     //cycle through all rooms
     for(room<-allRooms){
       room.vote = 0
+
+      //if user was last seen in this room use it as a tie breaker
+      for(user<-allUsers){
+        if((user.xPos > room.xMin)&(user.xPos < room.xMax)&(user.yPos > room.yMin)&(user.yPos < room.yMax)){
+          room.vote += 0.5
+        }
+      }
+
       //check all bubbles for edges in a room
       for(bubble <- allBubbles){
         tempCenterX = bubble.xPos.toInt
         tempCenterY = bubble.yPos.toInt
         tempRadius = bubble.width
         roomFlag = 0
-
+        //val userName: Array[String] = bubble.toString.split("-")
+        //println(userName(1))
 
         //another way, using trig
         for(deg <- 0 to 360){
@@ -267,13 +296,18 @@ object Viewer extends JFXApp {
     maxVote = 0
     for(room<-subRooms){
       room.vote = 0
+      //if user was last seen in this room use it as a tie breaker
+      for(user<-allUsers){
+        if((user.xPos > room.xMin)&(user.xPos < room.xMax)&(user.yPos > room.yMin)&(user.yPos < room.yMax)){
+          room.vote += 0.5
+        }
+      }
       //check all bubbles for edges in a room
       for(bubble <- allBubbles){
         tempCenterX = bubble.xPos.toInt
         tempCenterY = bubble.yPos.toInt
         tempRadius = bubble.width
         roomFlag = 0
-
 
         //another way, using trig
         for(deg <- 0 to 360){
@@ -314,8 +348,22 @@ object Viewer extends JFXApp {
     for(room<-subRooms) {
       if(room.vote == maxVote){
         val deltaX: Double = (room.xMax -room.xMin)/4
-        val deltaY: Double = (room.xMax -room.xMin)/4
-        drawUser(room.xMin + deltaX,room.yMin + deltaY,room.toString, deltaY)
+        val deltaY: Double = (room.yMax -room.yMin)/4
+        drawUser(room.xMin + 2* deltaX,room.yMin + 2* deltaY,room.toString, deltaY)
+        // unlock door if user is near
+        for(door<-allDoors){
+          val xD: Double = door.xPos - (room.xMin+ 2* deltaX)
+          val yD: Double = door.yPos - (room.yMin + 2* deltaY)
+          val dist: Double = Math.sqrt((xD*xD)+(yD*yD))
+
+          if(dist <= doorUnlockRadius){
+            door.shape.fill = Color.ForestGreen
+          }
+          else if(dist <= 2 * doorUnlockRadius){
+            door.shape.fill = Color.Yellow
+          }
+          else door.shape.fill = Color.Red
+        }
       }
     subRooms-=room
     }
@@ -431,37 +479,49 @@ object Viewer extends JFXApp {
       val station = (elements(elem) \ "station").as[String]
       val user = (elements(elem) \ "user").as[String]
       var strength = (elements(elem) \ "strength").as[Double]
-      val bubbleName = station + "_" + user
-
-
-      //strength transformation
-      strength += 56
-      strength *= (-1.0792)
-      if(strength < 0) strength = 1
-      strength *= signalScaler
-      strength *=  pixPerFoot
-      //println(strength.toString)
-
-      //search for the station in the existing nodes
-      for (room <- allRoomNodes) {
-        //When the room node is found then extract x,y info
-        if (station == room.toString) {
-          tempX = room.xPos
-          tempY = room.yPos
-        }
+      val bubbleName = station + "-" + user
+      val sTime = (elements(elem) \ "time").as[String]
+      val time: Double = sTime.toDouble
+      //println("station: " + station + "   Time: " + time.toString)
+      //evaluate the timestamp
+      if (timeMap.contains(bubbleName)) {
+        var tempTime: Double = timeMap(bubbleName)
+        if (tempTime < time) timeMap(bubbleName) = time
       }
+      else timeMap += (bubbleName -> time)
 
-      //search existing bubbles
-      for (bubble <- allBubbles) {
-        //if the bubble exists: destroy it
-        if (bubble.toString == bubbleName) {
-          sceneGraphics.children.remove(bubble.shape)
-          allBubbles -= bubble
+      //if it's the newest reading
+      if (timeMap(bubbleName) == time) {
+
+        //strength transformation
+        strength += 56
+        strength *= (-1.0792)
+        if (strength < 0) strength = 1
+        strength *= signalScaler
+        strength *= pixPerFoot
+        //println(strength.toString)
+
+        //search for the station in the existing nodes
+        for (room <- allRoomNodes) {
+          //When the room node is found then extract x,y info
+          if (station == room.toString) {
+            tempX = room.xPos
+            tempY = room.yPos
+          }
         }
-      }
 
-      //draw the new bubble
-      drawBubble(tempX, tempY, bubbleName, strength)
+        //search existing bubbles
+        for (bubble <- allBubbles) {
+          //if the bubble exists: destroy it
+          if (bubble.toString == bubbleName) {
+            sceneGraphics.children.remove(bubble.shape)
+            allBubbles -= bubble
+          }
+        }
+
+        //draw the new bubble
+        drawBubble(tempX, tempY, bubbleName, strength)
+      }
     }
   }
 
