@@ -183,7 +183,7 @@ object Viewer extends JFXApp {
     val midNewBubble = new Circle() {
       centerX = xVal
       centerY = yVal
-      radius = w - delta
+      radius = w
       fill = Color.Red
       opacity = 0.01
     }
