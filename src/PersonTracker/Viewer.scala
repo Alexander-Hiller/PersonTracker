@@ -365,10 +365,11 @@ object Viewer extends JFXApp {
           else door.shape.fill = Color.Red
         }
       }
-    subRooms-=room
     }
-
-
+    //delete all sub rooms when done to free up memory
+    for(room<-subRooms) {
+      subRooms-=room
+    }
   }
 
 
