@@ -282,7 +282,7 @@ object Viewer extends JFXApp {
       if(room.vote == maxVote){
         // split the room into 16 rectangles (4 x 4) "subRooms"
         val deltaX: Double = (room.xMax -room.xMin)/4
-        val deltaY: Double = (room.xMax -room.xMin)/4
+        val deltaY: Double = (room.yMax -room.yMin)/4
         for(i<- 0 to 3) {
           for(j<- 0 to 3) {
             newSubRoom(room.xMin + deltaX * j.toDouble, room.yMin + deltaY * i.toDouble, room.xMin + deltaX * (j + 1).toDouble, room.yMin + deltaY * (i + 1).toDouble, room.toString + "(" + j.toString + "," + i.toString + ")")
@@ -342,6 +342,7 @@ object Viewer extends JFXApp {
     //delete all sub rooms when done
     //temp delete all users until I add code to track better
     for(user<-allUsers){
+
       allUsers -= user
       sceneGraphics.children.remove(user.shape)
     }
